@@ -1,17 +1,16 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 const getToday = () => {
   const d = new Date();
   return d.toISOString().slice(0, 10);
 };
 
-const BetScreen = ({ sport, onBack, onPlaceBet }) => {
+const BetScreen = ({ sport, onBack, onPlaceBet, dogToWin, setDogToWin }) => {
   const [favTeam, setFavTeam] = useState("");
   const [dogTeam, setDogTeam] = useState("");
   const [favRisk, setFavRisk] = useState("");
   const [favToWin, setFavToWin] = useState("");
   const [dogRisk, setDogRisk] = useState("");
-  const [dogToWin, setDogToWin] = useState("");
   const [date, setDate] = useState(getToday());
 
   const handleSubmit = (e) => {
@@ -66,24 +65,30 @@ const BetScreen = ({ sport, onBack, onPlaceBet }) => {
             <input
               type="number"
               value={favRisk}
-              onChange={e => setFavRisk(e.target.value)}
+              onChange={e => {
+               const val = e.target.value;
+               if (/^\d*\.?\d{0,2}$/.test(val)) setFavRisk(val);
+              }}
               required
               min="0"
-              step="any"
+              step="0.01"
               style={{ width: "80px" }}
             />
           </label>
           <label style={{ flex: 1 }}>
-            To Win:{" "}
+            To Win:
             <input
               type="number"
               value={favToWin}
-              onChange={e => setFavToWin(e.target.value)}
+              onChange={e => {
+               const val = e.target.value;
+               if (/^\d*\.?\d{0,2}$/.test(val)) setFavToWin(val);
+              }}
               required
               min="0"
-              step="any"
+              step="0.01"
               style={{ width: "80px" }}
-            />
+          />
           </label>
         </div>
         <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
@@ -103,10 +108,13 @@ const BetScreen = ({ sport, onBack, onPlaceBet }) => {
             <input
               type="number"
               value={dogRisk}
-              onChange={e => setDogRisk(e.target.value)}
+              onChange={e => {
+               const val = e.target.value;
+               if (/^\d*\.?\d{0,2}$/.test(val)) setDogRisk(val);
+              }}
               required
               min="0"
-              step="any"
+              step="0.01"
               style={{ width: "80px" }}
             />
           </label>
@@ -115,10 +123,13 @@ const BetScreen = ({ sport, onBack, onPlaceBet }) => {
             <input
               type="number"
               value={dogToWin}
-              onChange={e => setDogToWin(e.target.value)}
+              onChange={e => {
+               const val = e.target.value;
+               if (/^\d*\.?\d{0,2}$/.test(val)) setDogToWin(val);
+              }}
               required
               min="0"
-              step="any"
+              step="0.01"
               style={{ width: "80px" }}
             />
           </label>
@@ -140,4 +151,5 @@ const BetScreen = ({ sport, onBack, onPlaceBet }) => {
     </div>
   );
 };
+
 export default BetScreen;

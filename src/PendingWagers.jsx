@@ -1,180 +1,182 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-// Helper to group wagers by sport, both teams, and date (so Dog/Fav order doesn't matter)
-function groupWagersByGame(wagers) {
-  const games = {};
-  wagers.forEach(wager => {
-    // Find all teams for this game (by sport and date)
-    const sameGameWagers = wagers.filter(
-      w =>
-        w.sport === wager.sport &&
-        w.date === wager.date
-    );
-    // Get unique teams for this game
-    const teams = Array.from(new Set(sameGameWagers.map(w => w.team))).sort();
-    // Only group if there are exactly 2 teams
-    if (teams.length === 2) {
-      const key = `${wager.sport}:${teams.join("|")}:${wager.date || ""}`;
-      if (!games[key]) games[key] = [];
-      // Only add each wager once
-      if (!games[key].includes(wager)) {
-        games[key].push(wager);
-      }
-    }
-  });
+// Group wagers by order submitted: every two wagers (Fav and Dog) are a game box
+function groupWagersBySubmission(wagers) {
+  const games = [];
+  for (let i = 0; i < wagers.length; i += 2) {
+    // Each game is an array of up to two wagers (Fav and Dog)
+    games.push(wagers.slice(i, i + 2));
+  }
   return games;
 }
 
-const PendingWagers = ({ wagers }) => {
-  const [clicked, setClicked] = useState({}); // { [gameKey]: wager.type }
-  const [showDetails, setShowDetails] = useState({}); // { [gameKey]: boolean }
+const PendingWagers = ({ wagers, onLoss }) => {
+  const [clicked, setClicked] = useState({});
+  const [submitting, setSubmitting] = useState({});
 
   if (!wagers || wagers.length === 0) {
     return <div>No pending wagers.</div>;
   }
 
-  // Calculate total risked
-  const totalRisked = wagers.reduce((sum, wager) => sum + Number(wager.risk || 0), 0);
-  // Calculate total to win
-  const totalToWin = wagers.reduce((sum, wager) => sum + Number(wager.toWin || 0), 0);
+  // Calculate totals
+  const totalRisked = wagers.reduce((sum, d) => sum + Number(d.risk || 0), 0);
+  const totalToWin = wagers.reduce((sum, d) => sum + Number(d.toWin || 0), 0);
+  const totalBalance = totalRisked;
 
-  // Group wagers by game (only games with 2 teams)
-  const grouped = groupWagersByGame(wagers);
+  const grouped = groupWagersBySubmission(wagers);
+
+  // Helper to remove all wagers for a game from pending
+  const removeGameFromPending = (gameWagers) => {
+    gameWagers.forEach(w => {
+      if (onLoss) onLoss(w);
+    });
+  };
 
   return (
     <div>
       <h3>Pending Wagers</h3>
-      <div style={{ marginBottom: "12px", fontWeight: "bold" }}>
-        Total Risked: ${totalRisked.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; 
+      <div style={{ marginBottom: "12px", color: "#555" }}>
+        Total Balance: ${totalBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;
+        Total Risked: ${totalRisked.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;
         Total To Win: ${totalToWin.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
-      {Object.entries(grouped).map(([gameKey, gameWagers]) => {
-        // Get the two teams for this game
-        const teams = Array.from(new Set(gameWagers.map(w => w.team))).sort();
-        // Find the Fav and Dog wager for each team (if present)
+      <div style={{ marginBottom: "12px", fontWeight: "bold" }}>
+        Total Risked: ${totalRisked.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;
+        Total To Win: ${totalToWin.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </div>
+      {grouped.map((gameWagers, idx) => {
         const favWager = gameWagers.find(w => w.type === "Fav");
         const dogWager = gameWagers.find(w => w.type === "Dog");
+        const teams = [favWager?.team, dogWager?.team].filter(Boolean);
+        const gameKey = `${favWager?.sport || dogWager?.sport || ""}:${teams.join("|")}:${favWager?.date || dogWager?.date || ""}`;
+        const selectedType = clicked[gameKey];
+        const selectedWager = selectedType === "Fav" ? favWager : selectedType === "Dog" ? dogWager : null;
+
         return (
           <div
-            key={gameKey}
+            key={gameKey + idx}
             style={{
               border: "2px solid #1976d2",
               borderRadius: "8px",
               padding: "16px",
               marginBottom: "20px",
-              background: "#f5faff",
+              background: "#fff",
               boxShadow: "0 2px 8px rgba(25, 118, 210, 0.07)",
               color: "#111"
             }}
           >
             <div style={{ fontWeight: "bold", marginBottom: "8px" }}>
-              {gameWagers[0].sport}: {teams.join(" vs ")}
-              {gameWagers[0].date ? ` (${gameWagers[0].date})` : ""}
-              <button
-                style={{
-                  marginLeft: 16,
-                  fontSize: "0.9em",
-                  padding: "2px 10px",
-                  borderRadius: "4px",
-                  border: "1px solid #1976d2",
-                  background: showDetails[gameKey] ? "#1976d2" : "#fff",
-                  color: showDetails[gameKey] ? "#fff" : "#1976d2",
-                  cursor: "pointer"
-                }}
-                onClick={() =>
-                  setShowDetails(prev => ({
-                    ...prev,
-                    [gameKey]: !prev[gameKey]
-                  }))
-                }
-              >
-                {showDetails[gameKey] ? "Hide Details" : "Show Details"}
-              </button>
+              {(favWager?.sport || dogWager?.sport) || ""}: {teams.join(" vs ")}
+              {(favWager?.date || dogWager?.date) ? ` (${favWager?.date || dogWager?.date})` : ""}
             </div>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Team</th>
-                  <th>Risk</th>
-                  <th>To Win</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>
-                    <span
-                      style={{
-                        cursor: favWager ? "pointer" : "default",
-                        color:
-                          clicked[gameKey] === "Fav"
-                            ? "red"
-                            : clicked[gameKey] === "Dog"
-                            ? "green"
-                            : "#1976d2",
-                        fontWeight: "bold"
-                      }}
-                      onClick={() => {
-                        if (favWager) {
-                          setClicked(prev => ({ ...prev, [gameKey]: "Fav" }));
-                          console.log("Deficit:", favWager);
-                        }
-                      }}
-                    >
-                      Fav
-                    </span>
-                  </td>
-                  <td>{teams[0]}</td>
-                  <td>{favWager ? favWager.risk : ""}</td>
-                  <td>{favWager ? favWager.toWin : ""}</td>
-                </tr>
-                <tr>
-                  <td>
-                    <span
-                      style={{
-                        cursor: dogWager ? "pointer" : "default",
-                        color:
-                          clicked[gameKey] === "Dog"
-                            ? "red"
-                            : clicked[gameKey] === "Fav"
-                            ? "green"
-                            : "#1976d2",
-                        fontWeight: "bold"
-                      }}
-                      onClick={() => {
-                        if (dogWager) {
-                          setClicked(prev => ({ ...prev, [gameKey]: "Dog" }));
-                          console.log("Deficit:", dogWager);
-                        }
-                      }}
-                    >
-                      Dog
-                    </span>
-                  </td>
-                  <td>{teams[1]}</td>
-                  <td>{dogWager ? dogWager.risk : ""}</td>
-                  <td>{dogWager ? dogWager.toWin : ""}</td>
-                </tr>
-              </tbody>
-            </table>
-            {/* Toggle wager details */}
-            {showDetails[gameKey] && (
-              <div style={{ marginTop: "10px", fontSize: "0.95em", color: "#444" }}>
-                <b>Wager Details:</b>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {gameWagers.map((w, i) => (
-                    <li key={i}>
-                      {w.type} on {w.team} &mdash; Risk: ${Number(w.risk).toFixed(2)}, To Win: ${Number(w.toWin).toFixed(2)}
-                    </li>
-                  ))}
-                </ul>
+            <div style={{ display: "flex", gap: 16 }}>
+              {/* Fav Box */}
+              <div style={{
+                flex: 1,
+                background: "#f9f9f9",
+                borderRadius: 6,
+                padding: 12,
+                border: clicked[gameKey] === "Fav" ? "2px solid #1976d2" : "1px solid #ccc"
+              }}>
+                <div style={{ fontWeight: "bold", color: "#1976d2" }}>Fav</div>
+                <div>Team: {favWager ? favWager.team : <span style={{ color: "#aaa" }}>N/A</span>}</div>
+                <div>Risk: {favWager ? favWager.risk : <span style={{ color: "#aaa" }}>N/A</span>}</div>
+                <div>To Win: {favWager ? favWager.toWin : <span style={{ color: "#aaa" }}>N/A</span>}</div>
+                <div>
+                  <input
+                    type="radio"
+                    name={`winner-${gameKey}`}
+                    checked={clicked[gameKey] === "Fav"}
+                    onChange={() => {
+                      if (favWager) setClicked(prev => ({ ...prev, [gameKey]: "Fav" }));
+                    }}
+                    disabled={!favWager}
+                  /> Select Winner
+                </div>
               </div>
-            )}
+              {/* Dog Box */}
+              <div style={{
+                flex: 1,
+                background: "#f9f9f9",
+                borderRadius: 6,
+                padding: 12,
+                border: clicked[gameKey] === "Dog" ? "2px solid #1976d2" : "1px solid #ccc"
+              }}>
+                <div style={{ fontWeight: "bold", color: "#1976d2" }}>Dog</div>
+                <div>Team: {dogWager ? dogWager.team : <span style={{ color: "#aaa" }}>N/A</span>}</div>
+                <div>Risk: {dogWager ? dogWager.risk : <span style={{ color: "#aaa" }}>N/A</span>}</div>
+                <div>To Win: {dogWager ? dogWager.toWin : <span style={{ color: "#aaa" }}>N/A</span>}</div>
+                <div>
+                  <input
+                    type="radio"
+                    name={`winner-${gameKey}`}
+                    checked={clicked[gameKey] === "Dog"}
+                    onChange={() => {
+                      if (dogWager) setClicked(prev => ({ ...prev, [gameKey]: "Dog" }));
+                    }}
+                    disabled={!dogWager}
+                  /> Select Winner
+                </div>
+              </div>
+            </div>
+            <button
+              style={{
+                marginTop: 16,
+                padding: "8px 24px",
+                background: "#1976d2",
+                color: "#fff",
+                border: "none",
+                borderRadius: 4,
+                cursor: selectedWager && !submitting[gameKey] ? "pointer" : "not-allowed",
+                opacity: selectedWager && !submitting[gameKey] ? 1 : 0.6,
+                width: "100%"
+              }}
+              disabled={!selectedWager || submitting[gameKey]}
+              onClick={() => {
+                if (!selectedWager) return;
+                setSubmitting(prev => ({ ...prev, [gameKey]: true }));
+
+                // Find the losing wager (the one not selected)
+                const loserWager = selectedType === "Fav" ? dogWager : favWager;
+
+                // Only submit the loser to the backend
+                if (loserWager) {
+                  fetch('http://localhost:8080/api/deficit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      team: loserWager.team,
+                      type: loserWager.type,
+                      risk: loserWager.risk,
+                      toWin: loserWager.toWin,
+                      deficit: Number(loserWager.risk || 0) + Number(loserWager.toWin || 0),
+                      gameKey
+                    }),
+                  })
+                    .then(res => res.json())
+                    .then(() => {
+                      removeGameFromPending(gameWagers);
+                    })
+                    .catch(err => {
+                      alert("Error saving deficit");
+                    })
+                    .finally(() => {
+                      setSubmitting(prev => ({ ...prev, [gameKey]: false }));
+                    });
+                } else {
+                  // If there is no loser (shouldn't happen), just remove from pending
+                  removeGameFromPending(gameWagers);
+                  setSubmitting(prev => ({ ...prev, [gameKey]: false }));
+                }
+              }}
+            >
+              Submit Winner
+            </button>
           </div>
         );
       })}
     </div>
   );
-}
+};
 
 export default PendingWagers;

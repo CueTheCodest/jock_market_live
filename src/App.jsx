@@ -3,7 +3,7 @@ import './App.css'
 import axios from 'axios'
 import BetScreen from './BetScreen'
 import PendingWagers from './PendingWagers'
-import { PendingWagersWithLoss, DeficitPage } from './Deficits';
+import DeficitsList from './DeficitsList';
 
 function App() {
   const [array, setArray] = useState([]);
@@ -11,6 +11,8 @@ function App() {
   const [showPending, setShowPending] = useState(false);
   const [wagers, setWagers] = useState([]);
   const [losses, setLosses] = useState([]);
+  const [showDeficits, setShowDeficits] = useState(false);
+  const [dogToWin, setDogToWin] = useState(""); // <-- Add this line
 
   const fetchAPI = async () => {
     const response = await axios.get('http://localhost:8080/api');
@@ -27,6 +29,7 @@ function App() {
     setWagers(prev => [...prev, wager]);
     setSelectedSport(null);
     setShowPending(true); // Optionally show pending wagers after placing a bet
+    setDogToWin(""); // Optionally clear Dog To Win after placing a bet
   };
 
   const handleLoss = (wager) => {
@@ -38,10 +41,23 @@ function App() {
     <>
       <h1>Guap Market Live</h1>
       <button
-        onClick={() => setShowPending(true)}
+        onClick={() => {
+          setShowPending(true);
+          setShowDeficits(false);
+        }}
         style={{ margin: '8px', padding: "10px 20px" }}
       >
         Pending
+      </button>
+      <button
+        onClick={() => {
+          setShowDeficits(true);
+          setShowPending(false);
+          setSelectedSport(null);
+        }}
+        style={{ margin: '8px', padding: "10px 20px" }}
+      >
+        Deficits
       </button>
       <div className="card" style={{ marginBottom: "24px" }}>
         {array.map((sport, index) => (
@@ -51,23 +67,36 @@ function App() {
             onClick={() => {
               setSelectedSport(sport);
               setShowPending(false);
+              setShowDeficits(false);
             }}
           >
             {sport}
           </button>
         ))}
       </div>
-      {showPending ? (
+      {showDeficits ? (
+        <DeficitsList
+          onBack={() => setShowDeficits(false)}
+          onDeficitClick={amount => {
+            setDogToWin(amount);
+            setShowDeficits(false); // Optionally close the list after click
+            setShowPending(false);
+            setSelectedSport("MLB"); // Optionally auto-select a sport, or remove this line
+          }}
+        />
+      ) : showPending ? (
         <PendingWagers wagers={wagers} onLoss={handleLoss} />
       ) : selectedSport ? (
         <BetScreen
           sport={selectedSport}
           onBack={() => setSelectedSport(null)}
           onPlaceBet={handlePlaceBet}
+          dogToWin={dogToWin}
+          setDogToWin={setDogToWin}
         />
       ) : null}
     </>
   )
 }
 
-export default App
+export default App;
